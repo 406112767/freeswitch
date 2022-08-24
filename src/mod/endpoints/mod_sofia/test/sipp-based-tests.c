@@ -48,7 +48,7 @@ static void test_wait_for_uuid(char *uuid)
 		SWITCH_STANDARD_STREAM(stream);
 		switch_api_execute("show", "channels", NULL, &stream);
 
-		if (!strncmp((char *)stream.data, "uuid,", 5)) {
+		if (stream.data && !strncmp((char *)stream.data, "uuid,", 5)) {
 			channel_data = switch_mprintf("%s", (char *)stream.data);
 			switch_safe_free(stream.data);
 			break;
@@ -76,7 +76,9 @@ static const char *test_wait_for_chan_var(switch_channel_t *channel, const char 
 	int loop_count = 50;
 	const char *var=NULL;
 	do {
-		if (!strcmp(switch_channel_get_variable(channel, "sip_cseq"),seq)){
+		const char *sip_cseq = switch_channel_get_variable(channel, "sip_cseq");
+
+		if (sip_cseq && seq && !strcmp(sip_cseq, seq)){
 			switch_sleep(100 * 1000);
 			var = switch_channel_get_variable(channel, "rtp_local_sdp_str");
 			break;
@@ -126,7 +128,7 @@ static void unregister_gw()
 
 static int start_sipp_uac(const char *ip, int remote_port, const char *dialed_number, const char *scenario_uac, const char *extra)
 {
-	char *cmd = switch_mprintf("sipp %s:%d -nr -p 5062 -m 1 -s %s -recv_timeout 10000 -timeout 10s -sf %s -bg %s", ip, remote_port, dialed_number, scenario_uac, extra);
+	char *cmd = switch_mprintf("sipp %s:%d -nr -p 5062 -m 1 -s %s -recv_timeout 10000 -timeout 20s -sf %s -bg %s", ip, remote_port, dialed_number, scenario_uac, extra);
 	int sys_ret = switch_system(cmd, SWITCH_TRUE);
 
 	printf("%s\n", cmd);
@@ -138,7 +140,7 @@ static int start_sipp_uac(const char *ip, int remote_port, const char *dialed_nu
 
 static int start_sipp_uas(const char *ip, int listen_port, const char *scenario_uas, const char *extra)
 {
-	char *cmd = switch_mprintf("sipp %s -p %d -nr -m 1 -s 1001 -recv_timeout 10000 -timeout 10s -sf %s -bg %s", ip, listen_port, scenario_uas, extra);
+	char *cmd = switch_mprintf("sipp %s -p %d -nr -m 1 -s 1001 -recv_timeout 10000 -timeout 20s -sf %s -bg %s", ip, listen_port, scenario_uas, extra);
 	int sys_ret = switch_system(cmd, SWITCH_TRUE);
 
 	printf("%s\n", cmd);
@@ -149,7 +151,7 @@ static int start_sipp_uas(const char *ip, int listen_port, const char *scenario_
 }
 static int run_sipp(const char *ip, int remote_port, int listen_port, const char *dialed_number, const char *scenario_uac, const char *auth_password, const char *extra)
 {
-	char *cmd = switch_mprintf("sipp %s:%d -nr -p %d -m 1 -s %s -recv_timeout 10000 -timeout 10s -sf %s -au %s -ap %s -bg %s", ip, remote_port, listen_port, dialed_number, scenario_uac, dialed_number, auth_password, extra);
+	char *cmd = switch_mprintf("sipp %s:%d -nr -p %d -m 1 -s %s -recv_timeout 10000 -timeout 20s -sf %s -au %s -ap %s -bg %s", ip, remote_port, listen_port, dialed_number, scenario_uac, dialed_number, auth_password, extra);
 	int sys_ret = switch_system(cmd, SWITCH_TRUE);
 
 	printf("%s\n", cmd);
@@ -161,6 +163,7 @@ static int run_sipp(const char *ip, int remote_port, int listen_port, const char
 
 static void kill_sipp(void)
 {
+	switch_sleep(2000 * 1000);
 	switch_system("pkill -x sipp", SWITCH_TRUE);
 	switch_sleep(1000 * 1000);
 }
@@ -692,11 +695,17 @@ skiptest:
 
 				switch_safe_free(to);
 				/* sipp should timeout, attempt kill, just in case.*/
-				kill_sipp();
+				//kill_sipp();
 			}
 		}
 		FST_TEST_END()
 
+		FST_TEST_BEGIN(keep_that_test_at_the_end)
+		{
+			/* We should give sofia time to execute all messages and cleanup */
+			switch_sleep(10000 * 1000);
+		}
+		FST_TEST_END()
 	}
 	FST_MODULE_END()
 }
