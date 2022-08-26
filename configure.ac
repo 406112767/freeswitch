@@ -2109,6 +2109,7 @@ AC_CONFIG_FILES([Makefile
 		src/mod/applications/mod_test/Makefile
 		src/mod/applications/mod_translate/Makefile
 		src/mod/applications/mod_valet_parking/Makefile
+    src/mod/applications/mod_vad/Makefile
 		src/mod/applications/mod_vmd/Makefile
 		src/mod/applications/mod_voicemail/Makefile
 		src/mod/applications/mod_voicemail_ivr/Makefile
