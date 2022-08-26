@@ -6149,6 +6149,20 @@ static switch_status_t read_rtp_packet(switch_rtp_t *rtp_session, switch_size_t 
 				}
 
 				if (!accept_packet) {
+					switch_channel_t *channel = switch_core_session_get_channel(rtp_session->session);
+					char * flag = (char *) switch_channel_get_private(channel, "_badRtp_");
+					if(!flag){
+						switch_event_t *event;
+						if (switch_event_create(&event, SWITCH_EVENT_CUSTOM) == SWITCH_STATUS_SUCCESS) {
+							char value[30];
+							switch_channel_event_set_data(channel, event);
+							switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Event-Subclass", "BAD_RTP");
+							snprintf(value, sizeof(value), "%d", rtp_session->last_rtp_hdr.pt);
+							switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "RTP_PT", value);
+							switch_event_fire(&event);
+						}
+						switch_channel_set_private(channel, "_badRtp_", "bad_rtp");
+					}
 					switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(rtp_session->session), SWITCH_LOG_DEBUG1,
 									  "Invalid Packet SEQ: %d TS: %d PT:%d ignored\n",
 									  ntohs(rtp_session->recv_msg.header.seq), ntohl(rtp_session->last_rtp_hdr.ts), rtp_session->last_rtp_hdr.pt);
