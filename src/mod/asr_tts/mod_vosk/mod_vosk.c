@@ -54,6 +54,7 @@ static struct {
 	int auto_reload;
 	switch_memory_pool_t *pool;
 	ks_pool_t *ks_pool;
+	int maxSilence;
 } globals;
 
 
@@ -62,6 +63,9 @@ typedef struct {
 	char *result;
 	switch_mutex_t *mutex;
 	switch_buffer_t *audio_buffer;
+	switch_vad_t *vad;
+	int vadFlag;
+	int silence;
 } vosk_t;
 
 /*! function to open the asr interface */
@@ -93,6 +97,11 @@ static switch_status_t vosk_asr_open(switch_asr_handle_t *ah, const char *codec,
 	ks_json_delete(&req);
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_INFO, "ASR open\n");
 
+    // init vad
+    vosk->vad = switch_vad_init(rate, 1);
+	vosk->vadFlag = 0;
+	vosk->silence = 0;
+
 	return SWITCH_STATUS_SUCCESS;
 }
 
@@ -108,7 +117,7 @@ static switch_status_t vosk_asr_close(switch_asr_handle_t *ah, switch_asr_flag_t
 	    libks library doens't implement it yet. */
 	kws_close(vosk->ws, KWS_CLOSE_SOCK);
 	kws_destroy(&vosk->ws);
-
+	switch_vad_destroy(&vosk->vad);
 	switch_set_flag(ah, SWITCH_ASR_FLAG_CLOSED);
 	switch_buffer_destroy(&vosk->audio_buffer);
 	switch_safe_free(vosk->result);
@@ -125,11 +134,36 @@ static switch_status_t vosk_asr_feed(switch_asr_handle_t *ah, void *data, unsign
 	uint8_t *rdata;
 	int rlen;
 	vosk_t *vosk = (vosk_t *) ah->private_info;
+	switch_vad_state_t vad_state;
 
 	if (switch_test_flag(ah, SWITCH_ASR_FLAG_CLOSED))
 		return SWITCH_STATUS_BREAK;
 
 	switch_mutex_lock(vosk->mutex);
+
+	vad_state = switch_vad_process(vosk->vad, data, len / 2);
+	if (vad_state == SWITCH_VAD_STATE_START_TALKING) {
+        vosk->vadFlag = 1;
+		vosk->silence = 0;
+    } else if (vad_state == SWITCH_VAD_STATE_STOP_TALKING) {
+        switch_vad_reset(vosk->vad);
+		vosk->silence = vosk->silence + 20;
+    } else if (vad_state == SWITCH_VAD_STATE_TALKING) {
+    } else {
+		vosk->silence = vosk->silence + 20;
+	}
+
+	// 当静默时间超过阈值时，不发送数据
+	if (vosk->silence > globals.maxSilence) {
+		vosk->vadFlag = 0;
+		vosk->silence = globals.maxSilence + 1;
+	}
+
+	// 当vad检测失效时，不像kws写入数据
+	if(!vosk->vadFlag){
+		switch_mutex_unlock(vosk->mutex);
+		return SWITCH_STATUS_SUCCESS;
+	}
 
 	switch_buffer_write(vosk->audio_buffer, data, len);
 	if (switch_buffer_inuse(vosk->audio_buffer) > AUDIO_BLOCK_SIZE) {
@@ -267,6 +301,11 @@ static switch_status_t load_config(void)
 			}
 			if (!strcasecmp(var, "return-json")) {
 				globals.return_json = atoi(val);
+			}
+			if (!strcasecmp(var, "maxSilence")) {
+				globals.maxSilence = atoi(val);
+			} else {
+				globals.maxSilence = 400;
 			}
 		}
 	}
