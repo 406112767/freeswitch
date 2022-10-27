@@ -1726,6 +1726,7 @@ static switch_status_t synth_speech_read_tts(switch_speech_handle_t *sh, void *d
 	bytes_read = *datalen;
 	if (speech_channel_read(schannel, data, &bytes_read, (*flags & SWITCH_SPEECH_FLAG_BLOCKING)) == SWITCH_STATUS_SUCCESS) {
 		/* pad data, if not enough read */
+		// 当tts的数据不够时，填充静音
 		if (bytes_read < *datalen) {
 #ifdef MOD_UNIMRCP_DEBUG_AUDIO_QUEUE
 			switch_log_printf(SWITCH_CHANNEL_UUID_LOG(schannel->session_uuid), SWITCH_LOG_DEBUG, "(%s) adding %ld bytes of padding\n", schannel->name, *datalen - bytes_read);
