@@ -471,40 +471,52 @@ SWITCH_STANDARD_APP(detect_speech_function)
 	char *argv[4];
 	int argc;
 	char *lbuf = NULL;
+	switch_status_t status = SWITCH_STATUS_SUCCESS;
+	switch_channel_t *channel = switch_core_session_get_channel(session);
 
 	if (!zstr(data) && (lbuf = switch_core_session_strdup(session, data))
 		&& (argc = switch_separate_string(lbuf, ' ', argv, (sizeof(argv) / sizeof(argv[0]))))) {
 		if (!strcasecmp(argv[0], "grammar") && argc >= 1) {
-			switch_ivr_detect_speech_load_grammar(session, argv[1], argv[2]);
+			status = switch_ivr_detect_speech_load_grammar(session, argv[1], argv[2]);
 		} else if (!strcasecmp(argv[0], "nogrammar")) {
-			switch_ivr_detect_speech_unload_grammar(session, argv[1]);
+			status = switch_ivr_detect_speech_unload_grammar(session, argv[1]);
 		} else if (!strcasecmp(argv[0], "grammaron")) {
-			switch_ivr_detect_speech_enable_grammar(session, argv[1]);
+			status = switch_ivr_detect_speech_enable_grammar(session, argv[1]);
 		} else if (!strcasecmp(argv[0], "grammaroff")) {
-			switch_ivr_detect_speech_disable_grammar(session, argv[1]);
+			status = switch_ivr_detect_speech_disable_grammar(session, argv[1]);
 		} else if (!strcasecmp(argv[0], "grammarsalloff")) {
-			switch_ivr_detect_speech_disable_all_grammars(session);
+			status = switch_ivr_detect_speech_disable_all_grammars(session);
 		} else if (!strcasecmp(argv[0], "init")) {
-			switch_ivr_detect_speech_init(session, argv[1], argv[2], NULL);
+			status = switch_ivr_detect_speech_init(session, argv[1], argv[2], NULL);
 		} else if (!strcasecmp(argv[0], "pause")) {
-			switch_ivr_pause_detect_speech(session);
+			status = switch_ivr_pause_detect_speech(session);
 		} else if (!strcasecmp(argv[0], "resume")) {
-			switch_ivr_resume_detect_speech(session);
+			status = switch_ivr_resume_detect_speech(session);
 		} else if (!strcasecmp(argv[0], "stop")) {
-			switch_ivr_stop_detect_speech(session);
+			status = switch_ivr_stop_detect_speech(session);
 		} else if (!strcasecmp(argv[0], "param")) {
-			switch_ivr_set_param_detect_speech(session, argv[1], argv[2]);
+			status = switch_ivr_set_param_detect_speech(session, argv[1], argv[2]);
 		} else if (!strcasecmp(argv[0], "start-input-timers")) {
-			switch_ivr_detect_speech_start_input_timers(session);
+			status = switch_ivr_detect_speech_start_input_timers(session);
 		} else if (!strcasecmp(argv[0], "start_input_timers")) {
 			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "start_input_timers is deprecated, please use start-input-timers instead!\n");
-			switch_ivr_detect_speech_start_input_timers(session);
+			status = switch_ivr_detect_speech_start_input_timers(session);
 		} else if (argc >= 3) {
-			switch_ivr_detect_speech(session, argv[0], argv[1], argv[2], argv[3], NULL);
+			status = switch_ivr_detect_speech(session, argv[0], argv[1], argv[2], argv[3], NULL);
 		}
 	} else {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Usage: %s\n", DETECT_SPEECH_SYNTAX);
 	}
+
+	switch (status) {
+	case SWITCH_STATUS_SUCCESS:
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "DETECT_SPEECH SUCCESS");
+		break;
+	default:
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "DETECT_SPEECH ERROR");
+		break;
+	}
+
 }
 
 #define PLAY_AND_DETECT_SPEECH_SYNTAX "<file> detect:<engine> {param1=val1,param2=val2}<grammar>"
@@ -2441,10 +2453,12 @@ SWITCH_STANDARD_APP(speak_function)
 	const char *voice = NULL;
 	char *text = NULL;
 	char *mydata = NULL;
+	switch_status_t status = SWITCH_STATUS_SUCCESS;
 	switch_input_args_t args = { 0 };
 
 	if (zstr(data) || !(mydata = switch_core_session_strdup(session, data))) {
 		switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "Invalid Params!\n");
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "SPEAK ERROR");
 		return;
 	}
 
@@ -2452,6 +2466,7 @@ SWITCH_STANDARD_APP(speak_function)
 
 	if (argc == 0) {
 		switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "Invalid Params!\n");
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "SPEAK ERROR");
 		return;
 	} else if (argc == 1) {
 		text = switch_core_session_strdup(session, data); /* unstripped text */
@@ -2483,6 +2498,7 @@ SWITCH_STANDARD_APP(speak_function)
 			text = "NULL";
 		}
 		switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_ERROR, "Invalid Params! [%s][%s][%s]\n", engine, voice, text);
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "SPEAK ERROR");
 		switch_channel_hangup(channel, SWITCH_CAUSE_DESTINATION_OUT_OF_ORDER);
 	}
 
@@ -2492,7 +2508,17 @@ SWITCH_STANDARD_APP(speak_function)
 
 	switch_channel_set_variable(channel, SWITCH_PLAYBACK_TERMINATOR_USED, "");
 
-	switch_ivr_speak_text(session, engine, voice, text, &args);
+	status = switch_ivr_speak_text(session, engine, voice, text, &args);
+
+	switch (status) {
+	case SWITCH_STATUS_SUCCESS:
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "SPEAK SUCCESS");
+		break;
+	default:
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "SPEAK ERROR");
+		break;
+	}
+
 }
 
 struct att_keys {
