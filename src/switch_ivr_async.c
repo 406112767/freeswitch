@@ -4996,6 +4996,8 @@ static void *SWITCH_THREAD_FUNC speech_thread(switch_thread_t *thread, void *obj
 
 	while (switch_channel_up_nosig(channel) && !switch_test_flag(sth->ah, SWITCH_ASR_FLAG_CLOSED)) {
 		char *xmlstr = NULL;
+		char *modname = NULL;
+		char *paramName = NULL;
 		switch_event_t *headers = NULL;
 
 		switch_thread_cond_wait(sth->cond, sth->mutex);
@@ -5060,8 +5062,15 @@ static void *SWITCH_THREAD_FUNC speech_thread(switch_thread_t *thread, void *obj
 			}
 
 			if (switch_event_create(&event, SWITCH_EVENT_DETECTED_SPEECH) == SWITCH_STATUS_SUCCESS) {
+				modname = switch_safe_strdup(sth->ah->name);
+				switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Mod-Name", modname);
 				if (status == SWITCH_STATUS_SUCCESS) {
 					switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Speech-Type", "detected-speech");
+
+					if (sth->ah->param) {
+						paramName = switch_safe_strdup(sth->ah->param);
+						switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "ASR-Param", paramName);
+					}
 
 					if (headers) {
 						switch_event_merge(event, headers);
@@ -5097,6 +5106,8 @@ static void *SWITCH_THREAD_FUNC speech_thread(switch_thread_t *thread, void *obj
 				}
 			}
 
+			switch_safe_free(paramName);
+			switch_safe_free(modname);
 			switch_safe_free(xmlstr);
 
 			if (headers) {
@@ -5107,6 +5118,9 @@ static void *SWITCH_THREAD_FUNC speech_thread(switch_thread_t *thread, void *obj
   done:
 
 	if (switch_event_create(&event, SWITCH_EVENT_DETECTED_SPEECH) == SWITCH_STATUS_SUCCESS) {
+		char *modname = NULL;
+		modname = switch_safe_strdup(sth->ah->name);
+		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Mod-Name", modname);
 		switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "Speech-Type", "closed");
 		if (switch_test_flag(sth->ah, SWITCH_ASR_FLAG_FIRE_EVENTS)) {
 			switch_event_t *dup;
@@ -5123,6 +5137,8 @@ static void *SWITCH_THREAD_FUNC speech_thread(switch_thread_t *thread, void *obj
 			switch_event_add_header_string(event, SWITCH_STACK_BOTTOM, "delivery-failure", "true");
 			switch_event_fire(&event);
 		}
+
+		switch_safe_free(modname);
 	}
 
 	switch_mutex_unlock(sth->mutex);
