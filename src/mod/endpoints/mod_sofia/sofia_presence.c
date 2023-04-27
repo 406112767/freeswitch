@@ -365,8 +365,10 @@ switch_status_t sofia_presence_chat_send(switch_event_t *message_event)
 					TAG_END());
 
 
+		// 通过chat方法向分机发送消息时，会导致堵塞，原始堵塞在20s，现修改为0.3s
 		if (is_blocking) {
-			sanity = 200;
+			sanity = 3;
+			// sanity = 200;
 
 			while(!mstatus && --sanity && !nua_handle_is_destroyed(msg_nh)) {
 				switch_yield(100000);
