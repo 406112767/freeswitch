@@ -508,9 +508,14 @@ SWITCH_STANDARD_APP(detect_speech_function)
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "Usage: %s\n", DETECT_SPEECH_SYNTAX);
 	}
 
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_INFO, "detect_speech [%d]\n", status);
+
 	switch (status) {
 	case SWITCH_STATUS_SUCCESS:
 		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "DETECT_SPEECH SUCCESS");
+		break;
+	case SWITCH_STATUS_NOT_INITALIZED:
+		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "DETECT_SPEECH NOT INIT");
 		break;
 	default:
 		switch_channel_set_variable(channel, SWITCH_CURRENT_APPLICATION_RESPONSE_VARIABLE, "DETECT_SPEECH ERROR");
@@ -2509,6 +2514,8 @@ SWITCH_STANDARD_APP(speak_function)
 	switch_channel_set_variable(channel, SWITCH_PLAYBACK_TERMINATOR_USED, "");
 
 	status = switch_ivr_speak_text(session, engine, voice, text, &args);
+
+	switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "speak text [%s][%s][%s][%d]\n", engine, voice, text, status);
 
 	switch (status) {
 	case SWITCH_STATUS_SUCCESS:
