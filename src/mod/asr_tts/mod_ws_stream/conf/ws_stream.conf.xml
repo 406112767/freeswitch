@@ -1,0 +1,5 @@
+<configuration name="ws_stream.conf" description="ws stream ASR Configuration">
+  <settings>
+    <param name="server-url" value="ws://localhost:2700"/>
+  </settings>
+</configuration>
